@@ -1,0 +1,27 @@
+{% for vm in spec -%}
+#cloud-config
+hostname: {{ vm.hostname }}
+local-hostname: {{ vm.hostname }}
+fqdn: {{ vm.hostname }}
+users:
+{%- for users in vm.cloud_data.user %}
+  {%- if users.name == 'root' %}
+  - user: {{ users.name }}
+    ssh_authorized_keys:
+    {%- for pubkeys in users.public_key %}
+      - {{ pubkeys }}
+    {%- endfor %}
+  {%- else %}
+  - user: {{ users.name }}
+    ssh_authorized_keys:
+    {%- for pubkeys in users.public_key %}
+      - {{ pubkeys }}
+    {%- endfor %}
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    shell: /bin/bash
+    groups: users, wheel
+  {%- endif %}
+{%- endfor %}
+ssh_pwauth: true
+disable_root: false
+{% endfor -%}

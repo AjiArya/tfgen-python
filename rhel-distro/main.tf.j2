@@ -1,0 +1,98 @@
+{% for vm in spec -%}
+resource "libvirt_cloudinit_disk" "{{ vm.name }}-cloudinit" {
+  name = "{{ vm.name }}-cloudinit.iso"                   
+  pool = "{{ vm.disk.storage_pool }}"
+  user_data = data.template_file.user{{ loop.index }}_data.rendered
+  network_config = data.template_file.network{{ loop.index }}_config.rendered
+}
+
+data "template_file" "user{{ loop.index }}_data" {         
+    template = file("${path.module}/user{{ loop.index }}_data.cfg")
+}
+     
+data "template_file" "network{{ loop.index }}_config" {
+    template = file("${path.module}/network{{ loop.index }}_config.cfg")
+}
+
+  {%- for disks in vm.disk.disk %}
+    {%- if loop.index == 1 %}
+
+resource "libvirt_volume" "{{ disks.name | replace(".qcow2", "") }}" {
+    name = "{{ disks.name }}"
+    pool = "{{ disks.storage_pool }}"
+    base_volume_name = "{{ vm.cloud_image.name }}"
+    base_volume_pool = "{{ vm.cloud_image.storage_pool }}"
+{%- if 'G' in disks.size %}
+    size = "{{ disks.size.replace('G', '')|int * 1073741824 }}"
+{%- endif %}
+{%- if 'M' in disks.size %}
+    size = "{{ disks.size.replace('M', '')|int * 1048576 }}"
+{%- endif %}
+    format = "qcow2"
+}
+    {% else %}
+
+resource "libvirt_volume" "{{ disks.name | replace(".qcow2", "") }}" {
+    name = "{{ disks.name }}"
+    pool = "{{ disks.storage_pool }}"
+{%- if 'G' in disks.size %}
+    size = "{{ disks.size.replace('G', '')|int * 1073741824 }}"
+{%- endif %}
+{%- if 'M' in disks.size %}
+    size = "{{ disks.size.replace('M', '')|int * 1048576 }}"
+{%- endif %}
+    format = "qcow2"
+}
+    {%- endif %}
+  {%- endfor %}
+
+resource "libvirt_domain" "{{ vm.name }}" {
+    name = "{{ vm.name }}"
+    memory = "16384"
+    vcpu = "4"
+
+  {%- if vm.nested_enabled is sameas true %} 
+
+    cpu = {
+           mode = "host-passthrough"
+    }
+  {%- endif %}
+
+    cloudinit = libvirt_cloudinit_disk.{{ vm.name }}-cloudinit.id
+
+    console {
+        type        = "pty"
+        target_port = "0"
+        target_type = "serial"
+    }
+
+    console {
+        type        = "pty"
+        target_port = "1"
+        target_type = "virtio"
+    }
+
+  {%- for network in vm.network %}
+
+    network_interface {
+        network_name = "{{ network.name }}"
+    {%- if network.address is defined %}
+        addresses = ["{{ network.address }}"]
+    {%- endif %}
+    }
+  {%- endfor %}
+
+  {%- for disks in vm.disk.disk %}
+    
+    disk {
+        volume_id = libvirt_volume.{{ disks.name | replace(".qcow2", "") }}.id
+    }
+  {%- endfor %}
+
+    graphics {
+        type = "{{ vm.console }}"
+        listen_type = "address"
+        autoport = true
+    }
+}
+{% endfor -%}

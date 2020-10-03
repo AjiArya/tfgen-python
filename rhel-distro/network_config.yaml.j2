@@ -1,0 +1,31 @@
+{% for vm in spec -%}
+version: 1
+config:
+  {%- for network in vm.network %}
+    {%- if loop.index == 1 %}
+  - type: physical
+    name: eth0
+    subnets:
+      - type: static
+        address: {{ network.address }}
+        netmask: 255.255.255.0  
+        gateway: {{ network.gateway }}
+        dns_nameservers:
+          {{ network.dns }}
+        routes:
+            - network: 0.0.0.0
+              netmask: 0.0.0.0
+              gateway: {{ network.gateway }}
+    {%- else %}  
+  - type: physical
+    name: eth{{ loop.index0 }}
+    subnets:
+      - type: static
+        address: {{ network.address }}
+        netmask: 255.255.255.0  
+        gateway: {{ network.gateway }}
+        dns_nameservers:
+          {{ network.dns }}
+    {%- endif %}  
+  {%- endfor %}
+{% endfor -%}
