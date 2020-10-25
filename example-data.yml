@@ -21,7 +21,7 @@ spec:
         disk:
             - name: <default_name_1>
               size: 10GB
-	            storage_pool: default=default_pool
+              storage_pool: default=default_pool
             - name: <default_name_2>
               size: 10GB
               storage_pool: default=default_pool
